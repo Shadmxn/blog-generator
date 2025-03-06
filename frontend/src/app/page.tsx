@@ -6,12 +6,21 @@ import BlogPreview from "@/components/BlogPreview";
 export default function Home() {
   const [topic, setTopic] = useState("");
   const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const generateBlog = async () => {
-    const res = await axios.post("http://localhost:5001/api/generate", {
-      topic,
-    }); // Ensure this matches backend port
-    setContent(res.data.content);
+    setLoading(true); // ✅ Show loading state
+    try {
+      console.log("Generate button clicked!");
+      const res = await axios.post("http://localhost:5001/api/generate", {
+        topic,
+      });
+      console.log("API Response:", res.data);
+      setContent(res.data.content);
+    } catch (error) {
+      console.error("Error generating blog:", error);
+    }
+    setLoading(false);
   };
 
   return (
@@ -26,9 +35,18 @@ export default function Home() {
       />
       <button
         onClick={generateBlog}
-        style={{ padding: "10px", marginRight: "10px" }}
+        style={{
+          padding: "10px",
+          marginRight: "10px",
+          backgroundColor: "#007bff",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+          borderRadius: "5px",
+        }}
+        disabled={loading} // ✅ Disable button while loading
       >
-        Generate
+        {loading ? "Generating..." : "Generate"}
       </button>
       <BlogPreview title={topic} content={content} />
     </div>
