@@ -9,14 +9,21 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   const generateBlog = async () => {
-    setLoading(true); // ✅ Show loading state
+    setLoading(true);
     try {
       console.log("Generate button clicked!");
       const res = await axios.post("http://localhost:5001/api/generate", {
         topic,
       });
       console.log("API Response:", res.data);
-      setContent(res.data.content);
+
+      // ✅ Format the content to break into paragraphs
+      const formattedContent = res.data.content
+        .split("\n\n") // Splits based on double newlines (paragraphs)
+        .map((para) => `<p>${para.trim()}</p>`) // Wraps each in <p>
+        .join(""); // Joins them as a single string
+
+      setContent(formattedContent);
     } catch (error) {
       console.error("Error generating blog:", error);
     }
