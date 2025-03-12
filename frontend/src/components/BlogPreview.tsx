@@ -2,10 +2,12 @@ export default function BlogPreview({
   title,
   content,
   imageUrl,
+  selectedFont,
 }: {
   title: string;
   content: string;
   imageUrl?: string;
+  selectedFont: string;
 }) {
   return (
     <div
@@ -22,6 +24,7 @@ export default function BlogPreview({
         marginLeft: "auto",
         marginRight: "auto",
         boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+        fontFamily: selectedFont,
       }}
     >
       <h2

@@ -8,6 +8,7 @@ export default function Home() {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [selectedFont, setSelectedFont] = useState("Arial"); // ✅ Default font
 
   const generateBlog = async () => {
     setLoading(true);
@@ -17,12 +18,7 @@ export default function Home() {
         topic,
       });
       console.log("API Response:", res.data);
-
-      const formattedContent = res.data.content
-        .split("\n\n")
-        .map((para) => `<p style="margin-bottom: 16px;">${para.trim()}</p>`)
-        .join("");
-      setContent(formattedContent);
+      setContent(res.data.content);
       setImageUrl(res.data.imageUrl);
     } catch (error) {
       console.error("Error generating blog:", error);
@@ -34,12 +30,13 @@ export default function Home() {
     <div
       style={{
         padding: "20px",
-        fontFamily: "Arial",
+        fontFamily: selectedFont,
         maxWidth: "800px",
         margin: "auto",
       }}
     >
       <h1>AI Blog Generator</h1>
+
       <input
         type="text"
         value={topic}
@@ -47,6 +44,21 @@ export default function Home() {
         placeholder="Enter blog topic"
         style={{ padding: "10px", width: "100%", marginBottom: "10px" }}
       />
+
+      {/* Font Selector Dropdown */}
+      <label style={{ marginRight: "10px" }}>Choose a Font:</label>
+      <select
+        value={selectedFont}
+        onChange={(e) => setSelectedFont(e.target.value)}
+        style={{ padding: "5px", marginBottom: "10px" }}
+      >
+        <option value="Arial">Arial</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Verdana">Verdana</option>
+        <option value="'Courier New', Courier, monospace">Courier New</option>
+      </select>
+
       <button
         onClick={generateBlog}
         style={{
@@ -56,6 +68,8 @@ export default function Home() {
           border: "none",
           cursor: "pointer",
           borderRadius: "5px",
+          display: "block",
+          marginTop: "10px",
         }}
         disabled={loading}
       >
@@ -68,7 +82,12 @@ export default function Home() {
         </p>
       )}
 
-      <BlogPreview title={topic} content={content} imageUrl={imageUrl} />
+      <BlogPreview
+        title={topic}
+        content={content}
+        imageUrl={imageUrl}
+        selectedFont={selectedFont}
+      />
     </div>
   );
 }
