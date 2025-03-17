@@ -6,6 +6,7 @@ import ReferenceBlog from "@/components/ReferenceBlog";
 
 export default function Home() {
   const [topic, setTopic] = useState("");
+  const [generatedTitle, setGeneratedTitle] = useState(""); // ✅ Store AI-generated title
   const [content, setContent] = useState("");
   const [featuredImage, setFeaturedImage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,6 +21,8 @@ export default function Home() {
         reference,
       });
       console.log("API Response:", res.data);
+
+      setGeneratedTitle(res.data.title); // ✅ Store AI-generated title
       setContent(res.data.content);
       setFeaturedImage(res.data.featuredImage);
     } catch (error) {
@@ -29,7 +32,7 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "800px", margin: "auto" }}>
+    <div style={{ padding: "20px", maxWidth: "1200px", margin: "auto" }}>
       <h1>AI Blog Generator</h1>
 
       <input
@@ -75,7 +78,7 @@ export default function Home() {
       )}
 
       <BlogPreview
-        title={topic}
+        title={generatedTitle}
         content={content}
         featuredImage={featuredImage}
       />
