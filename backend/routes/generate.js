@@ -23,31 +23,49 @@ router.post("/generate", async (req, res) => {
         {
           role: "user",
           content: `Generate a unique and engaging blog title for a blog about '${topic}', then write a high-quality blog post about it.
-  ${referenceText}
+          ${referenceText}
+          
+          - The blog title should be creative and attention-grabbing, not just a repetition of the topic.
+          - The blog should always begin with a strong opening paragraph (but do NOT label it as "Introduction").
+          - Identify key sections.
+          - **Use proper HTML headings** (<h2>, <h3>, etc.) for section titles instead of Markdown (### or **bold text**).
+          - The final paragraph should naturally conclude the blog but do NOT label it as "Conclusion."
+          - Insert placeholders like [IMAGE: Section Title] where an image should appear.
+          - Ensure natural paragraph breaks and a structured flow.
+          - **The entire response must be in valid HTML format. DO NOT use Markdown.**
+              
+          The response should be in this format:
+<TITLE>[Generated Blog Title]</TITLE>
 
-  - The blog title should be creative and attention-grabbing, not just a repetition of the topic.
-  - The blog should always begin with a strong opening paragraph.
-  - Identify key sections.
-  - Use proper HTML headings (<h2>, <h3>, etc.) for section titles. DO NOT use markdown (###).
-  - Insert placeholders like [IMAGE: Section Title] where an image should appear.
-  - Ensure natural paragraph breaks and a structured flow.
-  
-  The response should be in the following format:
-  **Title:** [Generated Blog Title]
-  **Content:** [Full Blog Content in valid HTML format with <h2>, <h3>, <p>, etc.]`,
+<CONTENT>
+[Full Blog Content in valid HTML]
+</CONTENT>
+`,
         },
       ],
-      max_tokens: 2000,
+      max_tokens: 2500,
     });
 
     const blogText = blogResponse.choices[0].message.content;
 
-    // ✅ Extract the title using regex
-    const titleMatch = blogText.match(/\*\*Title:\*\* (.+)/);
-    const title = titleMatch ? titleMatch[1] : topic; // Use topic if title is missing
+    const titleMatch = blogText.match(/<TITLE>(.+?)<\/TITLE>/);
+
+    let title = titleMatch ? titleMatch[1].trim() : "";
+
+    if (title.startsWith('"') && title.endsWith('"')) {
+      title = title.slice(1, -1); // Remove surrounding quotes if present
+    }
+
+    if (!title) {
+      console.warn(
+        "Warning: No unique title generated, using topic as fallback."
+      );
+      title = topic; // Fallback to topic only if AI fails
+    }
 
     // ✅ Extract the content after "Content:"
-    const contentMatch = blogText.match(/\*\*Content:\*\*([\s\S]*)/);
+    const contentMatch = blogText.match(/<CONTENT>([\s\S]*)<\/CONTENT>/);
+
     let blogContent = contentMatch ? contentMatch[1].trim() : blogText;
 
     // console.log("Generated Title:", title);

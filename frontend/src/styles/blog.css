@@ -172,11 +172,12 @@ section#blog-post .metadata {
 
   /* Images placed inside paragraphs */
   .blog-img-in-p {
-    max-width: 75%;
+    max-width: 300px;
     height: auto;
     display: block;
     margin: 20px auto;
     border-radius: 10px;
+    padding-left: 5px;
   }
 
   /* Smaller images for more compact layouts */
