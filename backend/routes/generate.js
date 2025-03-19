@@ -1,12 +1,73 @@
+const fs = require("fs-extra");
+const path = require("path");
 const express = require("express");
 const router = express.Router();
 const OpenAI = require("openai");
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Function to save blog as HTML & JSON locally
+const saveBlogFiles = async (title, content, featuredImageUrl) => {
+  const date = new Date().toISOString().split("T")[0]; // Format as YYYY-MM-DD
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, ""); // Convert to URL slug
+  const blogDir = path.join(__dirname, "../blogs"); // Save inside /blogs folder
+
+  // Ensure the folder exists
+  await fs.ensureDir(blogDir);
+
+  // Define file paths
+  const htmlFilePath = path.join(blogDir, `${date}-${slug}.html`);
+  const jsonFilePath = path.join(blogDir, `${date}-${slug}.json`);
+
+  // ✅ Prepare the blog HTML structure
+  const blogHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="${title}">
+        <title>${title}</title>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: auto; padding: 20px; }
+            img { max-width: 100%; height: auto; margin: 20px 0; }
+            h1, h2 { font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h1>${title}</h1>
+        <p><strong>Published on:</strong> ${date}</p>
+        <img src="${featuredImageUrl}" alt="Header Image">
+        ${content}
+    </body>
+    </html>
+  `;
+
+  // ✅ Prepare the metadata JSON file
+  const blogMetadata = {
+    title: title,
+    slug: slug,
+    date: date,
+    summary: "A brief summary of the blog goes here.",
+    image: featuredImageUrl,
+    url: `https://your-s3-bucket-url/blogs/${date}-${slug}.html`,
+  };
+
+  // ✅ Write files
+  await fs.writeFile(htmlFilePath, blogHtml, "utf8");
+  await fs.writeJson(jsonFilePath, blogMetadata, { spaces: 2 });
+
+  console.log(`✅ Blog saved: ${htmlFilePath}`);
+  console.log(`✅ Metadata saved: ${jsonFilePath}`);
+};
+
+// Main blog generation route
 router.post("/generate", async (req, res) => {
   try {
-    const { topic, reference } = req.body;
+    const { topic, reference = "" } = req.body;
 
     let referenceText = reference.trim()
       ? `Use the following reference blog to match style and structure:\n\n${reference}`
@@ -35,12 +96,11 @@ router.post("/generate", async (req, res) => {
           - **The entire response must be in valid HTML format. DO NOT use Markdown.**
               
           The response should be in this format:
-<TITLE>[Generated Blog Title]</TITLE>
+          <TITLE>[Generated Blog Title]</TITLE>
 
-<CONTENT>
-[Full Blog Content in valid HTML]
-</CONTENT>
-`,
+          <CONTENT>
+          [Full Blog Content in valid HTML]
+          </CONTENT>`,
         },
       ],
       max_tokens: 2500,
@@ -48,8 +108,8 @@ router.post("/generate", async (req, res) => {
 
     const blogText = blogResponse.choices[0].message.content;
 
+    // ✅ Extract Title
     const titleMatch = blogText.match(/<TITLE>(.+?)<\/TITLE>/);
-
     let title = titleMatch ? titleMatch[1].trim() : "";
 
     if (title.startsWith('"') && title.endsWith('"')) {
@@ -63,14 +123,11 @@ router.post("/generate", async (req, res) => {
       title = topic; // Fallback to topic only if AI fails
     }
 
-    // ✅ Extract the content after "Content:"
+    // ✅ Extract Blog Content
     const contentMatch = blogText.match(/<CONTENT>([\s\S]*)<\/CONTENT>/);
-
     let blogContent = contentMatch ? contentMatch[1].trim() : blogText;
 
-    // console.log("Generated Title:", title);
-    // console.log("Generated Content:", blogContent);
-
+    // ✅ Generate Featured Image
     const featuredImageResponse = await openai.images.generate({
       model: "dall-e-3",
       prompt: `A clean, modern, and visually engaging wide-format image representing '${topic}'. The image should be visually appealing and fit as a blog header.`,
@@ -81,6 +138,7 @@ router.post("/generate", async (req, res) => {
 
     const featuredImageUrl = featuredImageResponse.data[0].url;
 
+    // ✅ Generate Inline Images (Max 4)
     const maxImages = 4;
     const sectionTitles = [...blogContent.matchAll(/\[IMAGE: (.*?)\]/g)]
       .map((match) => match[1])
@@ -103,6 +161,7 @@ router.post("/generate", async (req, res) => {
       }
     }
 
+    // ✅ Replace Image Placeholders with Actual Images
     for (const title in imageUrls) {
       const imageTag = `<img src="${imageUrls[title]}" alt="${title}" class="blog-img-in-p"/>`;
       blogContent = blogContent.replace(`[IMAGE: ${title}]`, imageTag);
@@ -110,6 +169,10 @@ router.post("/generate", async (req, res) => {
 
     blogContent = `<p>${blogContent.replace(/\n/g, "</p><p>")}</p>`;
 
+    // ✅ Save Blog Files
+    await saveBlogFiles(title, blogContent, featuredImageUrl);
+
+    // ✅ Send Response
     res.json({ title, content: blogContent, featuredImage: featuredImageUrl });
   } catch (error) {
     console.error("Error in /generate route:", error);
