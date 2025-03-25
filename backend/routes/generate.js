@@ -3,24 +3,83 @@ const path = require("path");
 const express = require("express");
 const router = express.Router();
 const OpenAI = require("openai");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const axios = require("axios");
+const { v4: uuidv4 } = require("uuid");
+
+const s3 = new S3Client({
+  region: "us-east-1",
+});
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Function to save blog as HTML & JSON locally
+// Function to upload file to S3
+const uploadToS3 = async (fileName, fileContent, contentType) => {
+  const s3Params = {
+    Bucket: "blog-ai-bucket",
+    Key: fileName,
+    Body: Buffer.from(fileContent, "utf-8"),
+    ContentType: contentType,
+    ACL: "public-read",
+  };
+
+  try {
+    const uploadCommand = new PutObjectCommand(s3Params);
+    await s3.send(uploadCommand);
+    console.log(
+      `✅ Uploaded to S3: https://blog-ai-bucket.s3.amazonaws.com/${fileName}`
+    );
+    return `https://blog-ai-bucket.s3.amazonaws.com/${fileName}`;
+  } catch (err) {
+    console.error("S3 Upload Error:", err);
+    return null;
+  }
+};
+
+const uploadImageFromUrl = async (imageUrl, nameHint = "image") => {
+  try {
+    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    const buffer = Buffer.from(response.data, "binary");
+
+    const extension = imageUrl.includes(".png") ? "png" : "jpg";
+    const fileName = `images/${uuidv4()}-${nameHint}.${extension}`;
+
+    const uploadCommand = new PutObjectCommand({
+      Bucket: "blog-ai-bucket",
+      Key: fileName,
+      Body: buffer,
+      ContentType: `image/${extension}`,
+      ACL: "public-read",
+    });
+
+    await s3.send(uploadCommand);
+
+    const s3Url = `https://blog-ai-bucket.s3.amazonaws.com/${fileName}`;
+    console.log(`✅ Re-uploaded image to S3: ${s3Url}`);
+    return s3Url;
+  } catch (err) {
+    console.error("❌ Failed to upload image from OpenAI:", err.message);
+    return imageUrl; // fallback to original URL
+  }
+};
+
+// Function to save blog files locally & upload to S3
 const saveBlogFiles = async (title, content, featuredImageUrl) => {
-  const date = new Date().toISOString().split("T")[0]; // Format as YYYY-MM-DD
+  const date = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const slug = title
     .toLowerCase()
     .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, ""); // Convert to URL slug
+    .replace(/[^a-z0-9-]/g, ""); // Convert to slug
   const blogDir = path.join(__dirname, "../blogs"); // Save inside /blogs folder
 
   // Ensure the folder exists
   await fs.ensureDir(blogDir);
 
   // Define file paths
-  const htmlFilePath = path.join(blogDir, `${date}-${slug}.html`);
-  const jsonFilePath = path.join(blogDir, `${date}-${slug}.json`);
+  const htmlFileName = `${date}-${slug}.html`;
+  const jsonFileName = `${date}-${slug}.json`;
+  const htmlFilePath = path.join(blogDir, htmlFileName);
+  const jsonFilePath = path.join(blogDir, jsonFileName);
 
   // ✅ Prepare the blog HTML structure
   const blogHtml = `
@@ -48,20 +107,30 @@ const saveBlogFiles = async (title, content, featuredImageUrl) => {
 
   // ✅ Prepare the metadata JSON file
   const blogMetadata = {
-    title: title,
-    slug: slug,
-    date: date,
+    title,
+    slug,
+    date,
     summary: "A brief summary of the blog goes here.",
     image: featuredImageUrl,
-    url: `https://your-s3-bucket-url/blogs/${date}-${slug}.html`,
+    url: `https://blog-ai-bucket.s3.amazonaws.com/${htmlFileName}`, // S3 URL
   };
 
-  // ✅ Write files
+  // ✅ Save locally
   await fs.writeFile(htmlFilePath, blogHtml, "utf8");
   await fs.writeJson(jsonFilePath, blogMetadata, { spaces: 2 });
 
-  console.log(`✅ Blog saved: ${htmlFilePath}`);
-  console.log(`✅ Metadata saved: ${jsonFilePath}`);
+  console.log(`✅ Blog saved locally: ${htmlFilePath}`);
+  console.log(`✅ Metadata saved locally: ${jsonFilePath}`);
+
+  // ✅ Upload both HTML and JSON files to S3
+  const htmlUrl = await uploadToS3(htmlFileName, blogHtml, "text/html");
+  const jsonUrl = await uploadToS3(
+    jsonFileName,
+    JSON.stringify(blogMetadata, null, 2),
+    "application/json"
+  );
+
+  return { htmlUrl, jsonUrl }; // Return both URLs
 };
 
 // Main blog generation route
@@ -110,18 +179,7 @@ router.post("/generate", async (req, res) => {
 
     // ✅ Extract Title
     const titleMatch = blogText.match(/<TITLE>(.+?)<\/TITLE>/);
-    let title = titleMatch ? titleMatch[1].trim() : "";
-
-    if (title.startsWith('"') && title.endsWith('"')) {
-      title = title.slice(1, -1); // Remove surrounding quotes if present
-    }
-
-    if (!title) {
-      console.warn(
-        "Warning: No unique title generated, using topic as fallback."
-      );
-      title = topic; // Fallback to topic only if AI fails
-    }
+    let title = titleMatch ? titleMatch[1].trim() : topic; // Default to topic if title missing
 
     // ✅ Extract Blog Content
     const contentMatch = blogText.match(/<CONTENT>([\s\S]*)<\/CONTENT>/);
@@ -136,7 +194,11 @@ router.post("/generate", async (req, res) => {
       style: "natural",
     });
 
-    const featuredImageUrl = featuredImageResponse.data[0].url;
+    const tempFeaturedImageUrl = featuredImageResponse.data[0].url;
+    const featuredImageUrl = await uploadImageFromUrl(
+      tempFeaturedImageUrl,
+      "header"
+    );
 
     // ✅ Generate Inline Images (Max 4)
     const maxImages = 4;
@@ -155,25 +217,36 @@ router.post("/generate", async (req, res) => {
           style: "natural",
         });
 
-        imageUrls[title] = imageResponse.data[0].url;
+        const tempImageUrl = imageResponse.data[0].url;
+        const s3ImageUrl = await uploadImageFromUrl(tempImageUrl, title);
+
+        imageUrls[title] = s3ImageUrl;
       } catch (imageError) {
         console.error(`Failed to generate image for: ${title}`, imageError);
       }
     }
 
-    // ✅ Replace Image Placeholders with Actual Images
+    // ✅ Replace placeholders like [IMAGE: Section Title]
     for (const title in imageUrls) {
       const imageTag = `<img src="${imageUrls[title]}" alt="${title}" class="blog-img-in-p"/>`;
       blogContent = blogContent.replace(`[IMAGE: ${title}]`, imageTag);
     }
 
-    blogContent = `<p>${blogContent.replace(/\n/g, "</p><p>")}</p>`;
-
-    // ✅ Save Blog Files
-    await saveBlogFiles(title, blogContent, featuredImageUrl);
+    // ✅ Save Blog Files & Upload to S3
+    const { htmlUrl, jsonUrl } = await saveBlogFiles(
+      title,
+      blogContent,
+      featuredImageUrl
+    );
 
     // ✅ Send Response
-    res.json({ title, content: blogContent, featuredImage: featuredImageUrl });
+    res.json({
+      title,
+      content: blogContent,
+      featuredImage: featuredImageUrl,
+      htmlUrl,
+      jsonUrl,
+    });
   } catch (error) {
     console.error("Error in /generate route:", error);
     res.status(500).json({ error: error.message });
