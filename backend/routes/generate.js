@@ -8,7 +8,11 @@ const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
 
 const s3 = new S3Client({
-  region: "us-east-1",
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -20,7 +24,6 @@ const uploadToS3 = async (fileName, fileContent, contentType) => {
     Key: fileName,
     Body: Buffer.from(fileContent, "utf-8"),
     ContentType: contentType,
-    ACL: "public-read",
   };
 
   try {
@@ -49,7 +52,6 @@ const uploadImageFromUrl = async (imageUrl, nameHint = "image") => {
       Key: fileName,
       Body: buffer,
       ContentType: `image/${extension}`,
-      ACL: "public-read",
     });
 
     await s3.send(uploadCommand);
