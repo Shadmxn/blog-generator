@@ -13,3 +13,6 @@ const PORT = process.env.PORT || 5001; // Use 5001 instead of 5000
 app.listen(PORT, () =>
   console.log(`Backend running on http://localhost:${PORT}`)
 );
+
+const listBlogsRoute = require("./routes/listBlogs");
+app.use("/api", listBlogsRoute);
