@@ -135,6 +135,26 @@ const saveBlogFiles = async (title, content, featuredImageUrl) => {
   return { htmlUrl, jsonUrl }; // Return both URLs
 };
 
+const createImagePrompt = async (topic) => {
+  const imagePromptResponse = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a creative designer. Turn a blog topic into a DALL·E image generation prompt for a clean, modern blog header. The image should be a wide-format infographic or flat-style illustration. Include layout hints and make it visually clear and specific.",
+      },
+      {
+        role: "user",
+        content: `Topic: ${topic}`,
+      },
+    ],
+    max_tokens: 150,
+  });
+
+  return imagePromptResponse.choices[0].message.content.trim();
+};
+
 // Main blog generation route
 router.post("/generate", async (req, res) => {
   try {
@@ -183,17 +203,18 @@ router.post("/generate", async (req, res) => {
     const titleMatch = blogText.match(/<TITLE>(.+?)<\/TITLE>/);
     let title = titleMatch ? titleMatch[1].trim() : topic; // Default to topic if title missing
 
+    const finalImagePrompt = await createImagePrompt(title);
+    console.log("📸 DALL·E Prompt:", finalImagePrompt);
+
     // ✅ Extract Blog Content
     const contentMatch = blogText.match(/<CONTENT>([\s\S]*)<\/CONTENT>/);
     let blogContent = contentMatch ? contentMatch[1].trim() : blogText;
 
-    // ✅ Generate Featured Image
     const featuredImageResponse = await openai.images.generate({
       model: "dall-e-3",
-      prompt: `A clean, modern, and visually engaging wide-format image representing '${topic}'. The image should be visually appealing and fit as a blog header.`,
+      prompt: finalImagePrompt,
       n: 1,
       size: "1792x1024",
-      style: "natural",
     });
 
     const tempFeaturedImageUrl = featuredImageResponse.data[0].url;
@@ -213,10 +234,9 @@ router.post("/generate", async (req, res) => {
       try {
         const imageResponse = await openai.images.generate({
           model: "dall-e-3",
-          prompt: `A clean, modern, and visually appealing image representing '${title}'. The image should be clear and fit well beside text in a blog post.`,
+          prompt: `A flat-style illustration representing "${title}". Use modern, minimal design with no text, a soft color palette, and clear visuals. Ideal for placement beside text in a blog article.`,
           n: 1,
           size: "1024x1024",
-          style: "natural",
         });
 
         const tempImageUrl = imageResponse.data[0].url;
