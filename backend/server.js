@@ -34,7 +34,7 @@ const blogTopics = [
 
 let topicIndex = 0;
 
-cron.schedule("*/2 * * * *", async () => {
+cron.schedule("*/10 * * * *", async () => {
   const topic = blogTopics[topicIndex % blogTopics.length];
   topicIndex++;
 
