@@ -28,7 +28,7 @@ A full-stack blog generator tool that uses OpenAI to generate SEO-optimized blog
 ### 1. Clone the Repository
 
 ```bash
-git clone https://shadman2@bitbucket.org/FarazBhojani/expense-trend-web.git
+git clone git@github.com:Shadmxn/blog-generator.git
 cd blog-generator
 
 ```
