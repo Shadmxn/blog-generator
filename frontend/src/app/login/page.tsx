@@ -11,12 +11,13 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      await axios.post("http://localhost:5001/api/users/login", {
+      const res = await axios.post("http://localhost:5001/api/users/login", {
         email,
         password,
       });
 
       const { user, token } = res.data;
+
       storeAuth(user, token);
       router.push("/");
     } catch (err) {

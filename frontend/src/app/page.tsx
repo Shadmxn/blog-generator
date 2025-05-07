@@ -48,12 +48,11 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0d1117] text-white px-6 pt-20 pb-20 flex flex-col items-center">
+    <main className="min-h-screen bg-[#0d1117] text-white pt-10 flex flex-col items-center">
       {/* Logo/Header */}
       <header className="w-full max-w-7xl flex justify-between items-center mb-16 px-4">
         <div className="text-xl font-semibold flex items-center gap-2">
-          <span className="text-white">📘</span>
-          <span className="text-white">BlogGenius</span>
+          <span className="text-white">AI Blog Generator</span>
         </div>
 
         <div className="flex items-center gap-6">
@@ -174,6 +173,14 @@ export default function Home() {
           />
         </div>
       )}
+      {/* Footer Section */}
+      <footer className="w-full bg-[#161b22] text-gray-400 py-6 mt-auto">
+        <div className="max-w-7xl mx-auto flex justify-center px-4">
+          <div className="text-sm text-center">
+            <p>&copy; 2025 AI Blog Generator. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

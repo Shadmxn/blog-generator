@@ -23,7 +23,12 @@ export function loadAuth() {
 
   if (!user || !token) return null;
 
-  return { user: JSON.parse(user), token };
+  try {
+    return { user: user ? JSON.parse(user) : null, token };
+  } catch (error) {
+    console.error("Error parsing user data from localStorage:", error);
+    return null;
+  }
 }
 
 export function clearAuth() {
